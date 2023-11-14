@@ -10,7 +10,7 @@
     <AppDesignerFolder>Properties</AppDesignerFolder>
     <RootNamespace>HpToolsLauncher</RootNamespace>
     <AssemblyName>HpToolsLauncher</AssemblyName>
-    <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
+    <TargetFrameworkVersion>v4.8</TargetFrameworkVersion>
     <TargetFrameworkProfile>
     </TargetFrameworkProfile>
     <FileAlignment>512</FileAlignment>
@@ -89,6 +89,7 @@
     <Compile Include="ConsoleQuickEdit.cs" />
     <Compile Include="ElevatedProcess.cs" />
     <Compile Include="IProcessAdapter.cs" />
+    <Compile Include="TestRunners\ServiceTestRunner.cs" />
     <Compile Include="Utils\Encoder.cs" />
     <Compile Include="Utils\Encrypter.cs" />
     <Compile Include="Launcher.cs" />

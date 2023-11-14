@@ -244,6 +244,56 @@ namespace HpToolsLauncher
             {
                 case TestStorageType.AlmLabManagement:
 
+                case TestStorageType.LoadRunner:
+                    {
+                        //timeout between service commands
+                        int timeout =0;
+                        if (_ciParams.ContainsKey("fsTimeout"))
+                        {
+                            string strTimeoutInSeconds = _ciParams["fsTimeout"];
+                            if (strTimeoutInSeconds.Trim() != "-1")
+                                int.TryParse(strTimeoutInSeconds, out timeout);
+                        }                        
+
+                        //custom report path
+                        string reportPath = null;
+                        if (_ciParams.ContainsKey("fsReportPath"))
+                        {
+                            if (Directory.Exists(_ciParams["fsReportPath"]))
+                            {
+                                reportPath = _ciParams["fsReportPath"];
+                            }
+                            else
+                            {
+                                Console.WriteLine("============================================================================");
+                                Console.WriteLine("The provided results folder path {0} does not exist.", reportPath);
+                                Console.WriteLine("============================================================================");
+                                Environment.Exit((int)ExitCodeEnum.Failed);
+                            }
+                        }
+
+                        // users can provide a custom test path
+                        string testPath = _ciParams["Test1"].ToString();
+                            if (File.Exists(testPath))
+                            {  
+                                testPath = _ciParams["Test1"];
+                            }
+                            else
+                            {
+                                Console.WriteLine("============================================================================");
+                                Console.WriteLine("The provided scenario folder path {0} does not exist.", testPath);
+                                Console.WriteLine("============================================================================");
+                            }
+                        ServiceTestRunner svc = new ServiceTestRunner();
+                        bool result = svc.RunServiceTest(testPath,reportPath,timeout);
+                        if (result) Environment.Exit((int)ExitCodeEnum.Passed);
+                        else Environment.Exit((int)ExitCodeEnum.Failed);
+                        break;
+
+                    }
+
+
+
                 case TestStorageType.Alm:
                 { 
                     //check that all required parameters exist
