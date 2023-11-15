@@ -10,65 +10,67 @@ namespace HpToolsLauncher.TestRunners
         public string binPath = Environment.ExpandEnvironmentVariables("%LR_PATH%bin");
         public string clientPath = @"C:\test_lrun_svc\client";
         public string[] processesToKill = new string[] { "wlrun", "lrun_svc", "CmdServiceClient" };
+        public int _timeout;
 
         public bool RunServiceTest(string testPath, string resultsPath, int timeout)
         {
-            timeout *= 1000;
+            _timeout = timeout * 1000;
             Cleanup(processesToKill);
-            Console.WriteLine("[{0}] Cleanup complete.", DateTime.Now.ToString("h:mm:ss tt"));
+            LogMessage("Cleanup complete.");
 
-            StartLrunSvc(timeout);
-            Console.WriteLine("[{0}] lrun_svc.exe is running", DateTime.Now.ToString("h:mm:ss tt"));
-            Process client = StartClient(clientPath,timeout);
-            Console.WriteLine("[{0}] The client is running.", DateTime.Now.ToString("h:mm:ss tt"));
+            //Start lrun_svc.exe and CmdServiceClient.exe
+            StartLrunSvc();
+            LogMessage("lrun_svc.exe is running");
+            Process client = StartClient(clientPath);
+            LogMessage("CmdServiceClient.exe is running");
 
+            //Set the load test data to the given .lrs
             string command = "setLoadTestData " + testPath;
-            Write(client, command, timeout);
-            Console.WriteLine("[{0}] Command was:{1}", DateTime.Now.ToString("h:mm:ss tt"), command);
+            Write(client, command);
+            LogMessage("Command given:",command);
+
             string result = Read(client);
-            Console.WriteLine("[{0}] Client response: {1}.", DateTime.Now.ToString("h:mm:ss tt"), result);
-            if (result.Contains("failed"))
-            {
-                return false;
-            }
+            LogMessage("Client response:",result);
+            if (result.Contains("failed"))   return false;
 
-            Write(client,"startLoadTest",timeout);
-
+            //Start the load test
             Stopwatch stopWatch = new Stopwatch();
             stopWatch.Start();
             var startTime= DateTime.Now;
 
+            Write(client,"startLoadTest");
+            LogMessage("Command given: startLoadTest");
+
             result = Read(client);
-            Console.WriteLine("[{0}] Client response: {1}.", DateTime.Now.ToString("h:mm:ss tt"), result);
+            LogMessage("Client response:",result);
             if (result.Contains("failed"))
             {
                 return false;
             }
-            Console.WriteLine("[{0}] The test has started, waiting for the test to end.", DateTime.Now.ToString("h:mm:ss tt"));
+            LogMessage("The test has started, waiting for the test to end.");
 
+            //Get the result
             result = "";
-            while (!result.Contains("Ended"))
+            while (!result.Contains("Ended"))               //wait for the test to end
             {
                 Write(client, "getServiceState", 1000);     //ready, collating, running, ended
                 result = Read(client);
                 Thread.Sleep(1000);
             }
 
-
             stopWatch.Stop();
             TimeSpan ts = stopWatch.Elapsed;
             string elapsedTime = String.Format("{0:00}:{1:00}:{2:00}.{3:00}",
             ts.Hours, ts.Minutes, ts.Seconds,
             ts.Milliseconds / 10);
-            Console.WriteLine("[{0}] Test completed in {1}.", DateTime.Now.ToString("h:mm:ss tt"), elapsedTime);
-
+            LogMessage("Test completed in", elapsedTime);
             Dispose(client);
             Cleanup(processesToKill);
             return true;
         }
 
         #region Process utilities
-        public void StartLrunSvc(int timeout)
+        public void StartLrunSvc()
         {
             var startInfo = new System.Diagnostics.ProcessStartInfo
             {
@@ -80,10 +82,10 @@ namespace HpToolsLauncher.TestRunners
                 StartInfo = startInfo
             };
             proc.Start();
-            System.Threading.Thread.Sleep(timeout);
+            System.Threading.Thread.Sleep(_timeout);
         }
 
-        public Process StartClient(string clientPath, int timeout)
+        public Process StartClient(string clientPath)
         {
             var startInfo = new System.Diagnostics.ProcessStartInfo
             {
@@ -98,7 +100,7 @@ namespace HpToolsLauncher.TestRunners
                 StartInfo = startInfo
             };
             proc.Start();
-            System.Threading.Thread.Sleep(timeout);
+            System.Threading.Thread.Sleep(_timeout);
             return proc;
         }
 
@@ -124,9 +126,26 @@ namespace HpToolsLauncher.TestRunners
             }
 
         }
+
+        public void LogMessage(string message)
+        {
+            Console.WriteLine("[{0}] {1}.", DateTime.Now.ToString("h:mm:ss tt"), message);
+        }
+
+        public void LogMessage(string message, string extraInfo)
+        {
+            Console.WriteLine("[{0}] {1} {2}.", DateTime.Now.ToString("h:mm:ss tt"), message, extraInfo);
+        }
         #endregion
 
         #region Client communication
+        public void Write(Process client, string command)
+        {
+            StreamWriter writer = client.StandardInput;
+            writer.WriteLine(command);
+            System.Threading.Thread.Sleep(_timeout);
+            writer.Flush();
+        }
         public void Write(Process client, string command, int timeout)
         {
             StreamWriter writer = client.StandardInput;
