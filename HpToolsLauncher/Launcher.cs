@@ -254,19 +254,12 @@ namespace HpToolsLauncher
                                 timeout = parsedTimeout;
                         }
 
-                        string reportPath = null;
-                        if (_ciParams.ContainsKey("fsReportPath"))
+                        string resultsDirectory = _ciParams["fsReportPath"].ToString();
+                        if (!Directory.Exists(resultsDirectory))
                         {
-                            string potentialReportPath = _ciParams["fsReportPath"];
-                            if (Directory.Exists(potentialReportPath))
-                                reportPath = potentialReportPath;
-                            else
-                            {
-                                Console.WriteLine("The provided results folder path {0} does not exist.", potentialReportPath);
-                                Environment.Exit((int)ExitCodeEnum.Failed);
-                            }
+                            Console.WriteLine("The provided scenario folder path {0} does not exist.", resultsDirectory);
+                            Environment.Exit((int)ExitCodeEnum.Failed);
                         }
-
                         string testPath = _ciParams["Test1"].ToString();
                         if (!File.Exists(testPath))
                         {
@@ -275,7 +268,7 @@ namespace HpToolsLauncher
                         }
 
                         ServiceTestRunner svc = new ServiceTestRunner();
-                        bool result = svc.RunServiceTest(testPath, reportPath, timeout);
+                        bool result = svc.RunServiceTest(testPath, resultsDirectory, timeout);
 
                         Environment.Exit(result ? (int)ExitCodeEnum.Passed : (int)ExitCodeEnum.Failed);
                         break;

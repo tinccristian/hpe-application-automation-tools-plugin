@@ -8,11 +8,10 @@ namespace HpToolsLauncher.TestRunners
     public class ServiceTestRunner
     {
         public string binPath = Environment.ExpandEnvironmentVariables("%LR_PATH%bin");
-        public string clientPath = @"C:\test_lrun_svc\client";
-        public string[] processesToKill = new string[] { "wlrun", "lrun_svc", "CmdServiceClient" };
+        public string[] processesToKill = new string[] { "wlrun", "lrun_svc" };
         public int _timeout;
 
-        public bool RunServiceTest(string testPath, string resultsPath, int timeout)
+        public bool RunServiceTest(string testPath, string resultsDirectory, int timeout)
         {
             _timeout = timeout * 1000;
             Cleanup(processesToKill);
@@ -21,7 +20,7 @@ namespace HpToolsLauncher.TestRunners
             //Start lrun_svc.exe and CmdServiceClient.exe
             StartLrunSvc();
             LogMessage("lrun_svc.exe is running");
-            Process client = StartClient(clientPath);
+            Process client = StartClient();
             LogMessage("CmdServiceClient.exe is running");
 
             //Set the load test data to the given .lrs
@@ -30,14 +29,19 @@ namespace HpToolsLauncher.TestRunners
             LogMessage("Command given:",command);
 
             string result = Read(client);
+            LogMessage("Client response:", result);
+            if ((result.Contains("failed") || (result.Contains("empty")))) return false;
+
+            //Set the results folder directory
+            string command1 ="setResultsDirectory " + resultsDirectory;
+            Write(client, command1);
+            LogMessage("Command given:", command1);
+
+            result = Read(client);
             LogMessage("Client response:",result);
-            if (result.Contains("failed"))   return false;
+            if ((result.Contains("failed")|| (result.Contains("empty"))))   return false;
 
             //Start the load test
-            Stopwatch stopWatch = new Stopwatch();
-            stopWatch.Start();
-            var startTime= DateTime.Now;
-
             Write(client,"startLoadTest");
             LogMessage("Command given: startLoadTest");
 
@@ -48,6 +52,9 @@ namespace HpToolsLauncher.TestRunners
                 return false;
             }
             LogMessage("The test has started, waiting for the test to end.");
+            Stopwatch stopWatch = new Stopwatch();
+            stopWatch.Start();
+            var startTime= DateTime.Now;
 
             //Get the result
             result = "";
@@ -55,6 +62,11 @@ namespace HpToolsLauncher.TestRunners
             {
                 Write(client, "getServiceState", 1000);     //ready, collating, running, ended
                 result = Read(client);
+                if ((result.Contains("failed") || (result.Contains("empty"))))
+                {
+                    LogMessage(result);
+                    return false;
+                }
                 Thread.Sleep(1000);
             }
 
@@ -85,11 +97,11 @@ namespace HpToolsLauncher.TestRunners
             System.Threading.Thread.Sleep(_timeout);
         }
 
-        public Process StartClient(string clientPath)
+        public Process StartClient()
         {
             var startInfo = new System.Diagnostics.ProcessStartInfo
             {
-                FileName = clientPath + @"\CmdServiceClient.exe",
+                FileName = binPath + @"\CmdServiceClient.exe",
                 RedirectStandardInput = true,
                 RedirectStandardOutput = true,
                 UseShellExecute = false
@@ -129,12 +141,12 @@ namespace HpToolsLauncher.TestRunners
 
         public void LogMessage(string message)
         {
-            Console.WriteLine("[{0}] {1}.", DateTime.Now.ToString("h:mm:ss tt"), message);
+            Console.WriteLine("[{0}] {1}", DateTime.Now.ToString("h:mm:ss tt"), message);
         }
 
         public void LogMessage(string message, string extraInfo)
         {
-            Console.WriteLine("[{0}] {1} {2}.", DateTime.Now.ToString("h:mm:ss tt"), message, extraInfo);
+            Console.WriteLine("[{0}] {1} {2}", DateTime.Now.ToString("h:mm:ss tt"), message, extraInfo);
         }
         #endregion
 
