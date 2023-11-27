@@ -35,9 +35,7 @@ import com.microfocus.application.automation.tools.EncryptionUtils;
 import com.microfocus.application.automation.tools.Messages;
 import com.microfocus.application.automation.tools.lr.model.ScriptRTSSetModel;
 import com.microfocus.application.automation.tools.lr.model.SummaryDataLogModel;
-import com.microfocus.application.automation.tools.mc.JobConfigurationProxy;
 import com.microfocus.application.automation.tools.model.*;
-import com.microfocus.application.automation.tools.settings.MCServerSettingsGlobalConfiguration;
 import com.microfocus.application.automation.tools.uft.model.SpecifyParametersModel;
 import com.microfocus.application.automation.tools.uft.model.UftRunAsUser;
 import com.microfocus.application.automation.tools.uft.model.UftSettingsModel;
@@ -84,7 +82,7 @@ public class RunFromService extends Builder implements SimpleBuildStep {
 
     private String ParamFileName = "ApiRun.txt";
 
-    private RunFromFileSystemModel runFromFileModel;
+    private RunFromServiceModel runFromServiceModel;
 
     private FileSystemTestSetModel fileSystemTestSetModel;
     private SpecifyParametersModel specifyParametersModel;
@@ -98,220 +96,37 @@ public class RunFromService extends Builder implements SimpleBuildStep {
 
     private Map<Long, String> resultFileNames;
 
-    /**
-     * Instantiates a new Run from file builder.
-     *
-     * @param fsTests the fs tests
-     */
-    @DataBoundConstructor
-    public RunFromService(String fsTests,
-                              boolean isParallelRunnerEnabled,
-                              boolean areParametersEnabled,
-                              SpecifyParametersModel specifyParametersModel,
-                              FileSystemTestSetModel fileSystemTestSetModel,
-                              SummaryDataLogModel summaryDataLogModel,
-                              ScriptRTSSetModel scriptRTSSetModel,
-                              UftSettingsModel uftSettingsModel) {
-        this.runFromFileModel = new RunFromFileSystemModel(fsTests);
-        this.specifyParametersModel = specifyParametersModel;
-        this.fileSystemTestSetModel = fileSystemTestSetModel;
-        this.isParallelRunnerEnabled = isParallelRunnerEnabled;
-        this.areParametersEnabled = areParametersEnabled;
-        this.summaryDataLogModel = summaryDataLogModel;
-        this.scriptRTSSetModel = scriptRTSSetModel;
-        this.uftSettingsModel = uftSettingsModel;
-        if (uftSettingsModel != null) {
-            uftSettingsModel.setFsTestPath(getFsTests());
-        }
-        resultFileNames = new HashMap<Long, String>();
-    }
 
-    /**
-     * Instantiates a new Run from file builder.
-     *
-     * @param fsTests the fs tests
-     */
-    public RunFromService(String fsTests) {
-        runFromFileModel = new RunFromFileSystemModel(fsTests);
-    }
+    // /**
+    //  * Instantiates a new Run from file builder.
+    //  *
+    //  * @param fsTests the fs tests
+    //  */
+    // public RunFromService(String fsTests) {
+    //     runFromServiceModel = new RunFromServiceModel(fsTests);
+    // }
 
-    /**
-     * Instantiates a new Run from file builder.
-     *
-     * @param runFromFileModel the run from file model
-     */
-    public RunFromService(RunFromFileSystemModel runFromFileModel) {
-        this.runFromFileModel = runFromFileModel;
-    }
+    // /**
+    //  * Instantiates a new Run from file builder.
+    //  *
+    //  * @param runFromServiceModel the run from file model
+    //  */
+    // public RunFromService(RunFromServiceModel runFromServiceModel) {
+    //     this.runFromServiceModel = runFromServiceModel;
+    // }
 
     /**
      * @param fsTests                   the fs tests
      * @param fsTimeout                 the fs timeout
-     * @param controllerPollingInterval the controller polling interval
-     * @param perScenarioTimeOut        the per scenario time out
-     * @param ignoreErrorStrings        the ignore error strings
-     * @param analysisTemplate          the analysis template
-     * @param displayController         the display controller
-     * @param mcServerName              the mc server name
-     * @param fsDeviceId                the fs device id
-     * @param fsTargetLab               the fs target lab
-     * @param fsManufacturerAndModel    the fs manufacturer and model
-     * @param fsOs                      the fs os
-     * @param fsAutActions              the fs aut actions
-     * @param fsLaunchAppName           the fs launch app name
-     * @param fsDevicesMetrics          the fs devices metrics
-     * @param fsInstrumented            the fs instrumented
-     * @param fsExtraApps               the fs extra apps
-     * @param fsJobId                   the fs job id
-     * @param proxySettings             the proxy settings
-     * @param useSSL                    the use ssl
-     * @deprecated Instantiates a new Run from file builder.
+     * @param fsReportPath              the fs rerport path
      */
-    @SuppressWarnings("squid:S00107")
-    @Deprecated
-    public RunFromService(String fsTests, String fsTimeout, String fsUftRunMode, String controllerPollingInterval,
-                              String perScenarioTimeOut, String ignoreErrorStrings, String displayController,
-                              String analysisTemplate, String mcServerName, AuthModel authModel, String fsDeviceId, String fsTargetLab, String fsManufacturerAndModel,
-                              String fsOs, String fsAutActions, String fsLaunchAppName, String fsDevicesMetrics,
-                              String fsInstrumented, String fsExtraApps, String fsJobId, ProxySettings proxySettings,
-                              boolean useSSL, boolean isParallelRunnerEnabled, String fsReportPath) {
-        this.isParallelRunnerEnabled = isParallelRunnerEnabled;
-        runFromFileModel = new RunFromFileSystemModel(fsTests, fsTimeout, fsUftRunMode, controllerPollingInterval,
-                perScenarioTimeOut, ignoreErrorStrings, displayController, analysisTemplate, mcServerName,
-                authModel, fsDeviceId, fsTargetLab, fsManufacturerAndModel, fsOs,
-                fsAutActions, fsLaunchAppName, fsDevicesMetrics, fsInstrumented, fsExtraApps, fsJobId,
-                proxySettings, useSSL, fsReportPath);
-    }
+    @DataBoundConstructor
+    public RunFromService(RunFromServiceModel runFromSm) {
 
-    /**
-     * Replace the fsTests given as mtbx with the actual mtbx file.
-     *
-     * @param workspace the current workspace
-     * @param props     the properties
-     * @param content   the mtbx content
-     * @param key       the test key
-     * @param time      current time string
-     * @param index     the index for the prefix
-     * @throws Exception
-     */
-    private static void replaceTestWithMtbxFile(FilePath workspace, Properties props, String content, String key,
-                                                String time, int index) throws Exception {
-        if (UftToolUtils.isMtbxContent(content)) {
-            try {
-                String prefx = index > 0 ? index + "_" : "";
-                String mtbxFilePath = prefx + createMtbxFileInWs(workspace, content, time);
-                props.setProperty(key, mtbxFilePath);
-            } catch (IOException | InterruptedException e) {
-                throw new Exception(e);
-            }
-        }
-    }
-
-    /**
-     * Replace the fsTests given as mtbx with the actual mtbx file.
-     *
-     * @param workspace the current workspace
-     * @param props     the properties
-     * @param content   the mtbx content
-     * @param key       the test key
-     * @param time      current time string
-     * @throws Exception
-     */
-    private static void replaceTestWithMtbxFile(FilePath workspace, Properties props, String content, String key,
-                                                String time) throws Exception {
-        replaceTestWithMtbxFile(workspace, props, content, key, time, 0);
-    }
-
-    /**
-     * Creates an .mtbx file with the provided mtbx content.
-     *
-     * @param workspace   jenkins workspace
-     * @param mtbxContent the motbx content
-     * @param timeString  current time represented as a String
-     * @return the remote file path
-     * @throws IOException
-     * @throws InterruptedException
-     */
-    private static String createMtbxFileInWs(FilePath workspace, String mtbxContent, String timeString)
-            throws IOException, InterruptedException {
-        String fileName = "test_suite_" + timeString + ".mtbx";
-
-        FilePath remoteFile = workspace.child(fileName);
-
-        String mtbxContentUpdated = mtbxContent.replace("${WORKSPACE}", workspace.getRemote());
-        if (mtbxContent.contains("${workspace}")) {
-            mtbxContentUpdated = mtbxContent.replace("${workspace}", workspace.getRemote());
-        }
-        InputStream in = IOUtils.toInputStream(mtbxContentUpdated, "UTF-8");
-        remoteFile.copyFrom(in);
-
-        return remoteFile.getRemote();
-    }
-
-    public FileSystemTestSetModel getFileSystemTestSetModel() {
-        return fileSystemTestSetModel;
-    }
-
-    /**
-     * Gets the parallel runner flag.
-     *
-     * @return the current parallel runner flag state(enabled/disabled)
-     */
-    public boolean getIsParallelRunnerEnabled() {
-        return isParallelRunnerEnabled;
-    }
-
-    /**
-     * Sets the parallel runner flag
-     *
-     * @param isParallelRunnerEnabled the parallel runner flag
-     */
-    @DataBoundSetter
-    private void setIsParallelRunnerEnabled(boolean isParallelRunnerEnabled) {
-        this.isParallelRunnerEnabled = isParallelRunnerEnabled;
-    }
-
-    public String getAnalysisTemplate() {
-        return runFromFileModel.getAnalysisTemplate();
-    }
-
-    /**
-     * Sets analysis template.
-     *
-     * @param analysisTemplate the analysis template
-     */
-    @DataBoundSetter
-    public void setAnalysisTemplate(String analysisTemplate) {
-        runFromFileModel.setAnalysisTemplate(analysisTemplate);
-    }
-
-    public SummaryDataLogModel getSummaryDataLogModel() {
-        return summaryDataLogModel;
-    }
-
-    public void setSummaryDataLogModel(SummaryDataLogModel summaryDataLogModel) {
-        this.summaryDataLogModel = summaryDataLogModel;
-    }
-
-    public ScriptRTSSetModel getScriptRTSSetModel() {
-        return scriptRTSSetModel;
-    }
-
-    public void setScriptRTSSetModel(ScriptRTSSetModel scriptRTSSetModel) {
-        this.scriptRTSSetModel = scriptRTSSetModel;
-    }
-
-    public UftSettingsModel getUftSettingsModel() {
-        return uftSettingsModel;
-    }
-
-    @DataBoundSetter
-    public void setUftSettingsModel(UftSettingsModel uftSettingsModel) {
-        this.uftSettingsModel = uftSettingsModel;
     }
 
     public String getFsTimeout() {
-        return runFromFileModel.getFsTimeout();
+        return runFromServiceModel.getFsTimeout();
     }
 
     /**
@@ -321,266 +136,15 @@ public class RunFromService extends Builder implements SimpleBuildStep {
      */
     @DataBoundSetter
     public void setFsTimeout(String fsTimeout) {
-        runFromFileModel.setFsTimeout(fsTimeout);
+        runFromServiceModel.setFsTimeout(fsTimeout);
     }
 
     public String getFsTests() {
-        return runFromFileModel.getFsTests();
+        return runFromServiceModel.getFsTests();
     }
 
     public void setFsTests(String fsTests) {
-        runFromFileModel.setFsTests(fsTests);
-    }
-
-    public String getControllerPollingInterval() {
-        return runFromFileModel.getControllerPollingInterval();
-    }
-
-    /**
-     * Sets controller polling interval.
-     *
-     * @param controllerPollingInterval the controller polling interval
-     */
-    @DataBoundSetter
-    public void setControllerPollingInterval(String controllerPollingInterval) {
-        runFromFileModel.setControllerPollingInterval(controllerPollingInterval);
-    }
-
-    public String getPerScenarioTimeOut() {
-        return runFromFileModel.getPerScenarioTimeOut();
-    }
-
-    /**
-     * Sets per scenario time out.
-     *
-     * @param perScenarioTimeOut the per scenario time out
-     */
-    @DataBoundSetter
-    public void setPerScenarioTimeOut(String perScenarioTimeOut) {
-        runFromFileModel.setPerScenarioTimeOut(perScenarioTimeOut);
-    }
-
-    public String getDisplayController() {
-        return runFromFileModel.getDisplayController();
-    }
-
-    /**
-     * Sets display controller.
-     *
-     * @param displayController the display controller
-     */
-    @DataBoundSetter
-    public void setDisplayController(String displayController) {
-        runFromFileModel.setDisplayController(displayController);
-    }
-
-    public String getFsAutActions() {
-        return runFromFileModel.getFsAutActions();
-    }
-
-    /**
-     * Sets fs aut actions.
-     *
-     * @param fsAutActions the fs aut actions
-     */
-    @DataBoundSetter
-    public void setFsAutActions(String fsAutActions) {
-        runFromFileModel.setFsAutActions(fsAutActions);
-    }
-
-    public String getFsDeviceId() {
-        return runFromFileModel.getFsDeviceId();
-    }
-
-    /**
-     * Sets fs device id.
-     *
-     * @param fsDeviceId the fs device id
-     */
-    @DataBoundSetter
-    public void setFsDeviceId(String fsDeviceId) {
-        runFromFileModel.setFsDeviceId(fsDeviceId);
-    }
-
-    public String getFsDevicesMetrics() {
-        return runFromFileModel.getFsDevicesMetrics();
-    }
-
-    /**
-     * Sets fs devices metrics.
-     *
-     * @param fsDevicesMetrics the fs devices metrics
-     */
-    @DataBoundSetter
-    public void setFsDevicesMetrics(String fsDevicesMetrics) {
-        runFromFileModel.setFsDevicesMetrics(fsDevicesMetrics);
-    }
-
-    public String getFsExtraApps() {
-        return runFromFileModel.getFsExtraApps();
-    }
-
-    /**
-     * Sets fs extra apps.
-     *
-     * @param fsExtraApps the fs extra apps
-     */
-    @DataBoundSetter
-    public void setFsExtraApps(String fsExtraApps) {
-        runFromFileModel.setFsExtraApps(fsExtraApps);
-    }
-
-    public String getFsOs() {
-        return runFromFileModel.getFsOs();
-    }
-
-    /**
-     * Sets fs os.
-     *
-     * @param fsOs the fs os
-     */
-    @DataBoundSetter
-    public void setFsOs(String fsOs) {
-        runFromFileModel.setFsOs(fsOs);
-    }
-
-    public String getFsInstrumented() {
-        return runFromFileModel.getFsInstrumented();
-    }
-
-    /**
-     * Sets fs instrumented.
-     *
-     * @param fsInstrumented the fs instrumented
-     */
-    @DataBoundSetter
-    public void setFsInstrumented(String fsInstrumented) {
-        runFromFileModel.setFsInstrumented(fsInstrumented);
-    }
-
-    public String getFsJobId() {
-        return runFromFileModel.getFsJobId();
-    }
-
-    /**
-     * Sets fs job id.
-     *
-     * @param fsJobId the fs job id
-     */
-    @DataBoundSetter
-    public void setFsJobId(String fsJobId) {
-        runFromFileModel.setFsJobId(fsJobId);
-    }
-
-    public String getFsUftRunMode() {
-        return runFromFileModel.getFsUftRunMode();
-    }
-
-    /**
-     * Sets fs runMode.
-     *
-     * @param fsUftRunMode the fs runMode
-     */
-    @DataBoundSetter
-    public void setFsUftRunMode(String fsUftRunMode) {
-        runFromFileModel.setFsUftRunMode(fsUftRunMode);
-    }
-
-    public String getIgnoreErrorStrings() {
-        return runFromFileModel.getIgnoreErrorStrings();
-    }
-
-    /**
-     * Sets ignore error strings.
-     *
-     * @param ignoreErrorStrings the ignore error strings
-     */
-    @DataBoundSetter
-    public void setIgnoreErrorStrings(String ignoreErrorStrings) {
-        runFromFileModel.setIgnoreErrorStrings(ignoreErrorStrings);
-    }
-
-    public String getMcServerName() {
-        return runFromFileModel.getMcServerName();
-    }
-
-    /**
-     * Sets mc server name.
-     *
-     * @param mcServerName the mc server name
-     */
-    @DataBoundSetter
-    public void setMcServerName(String mcServerName) {
-        runFromFileModel.setMcServerName(mcServerName);
-    }
-
-    public String getFsManufacturerAndModel() {
-        return runFromFileModel.getFsManufacturerAndModel();
-    }
-
-    /**
-     * Sets fs manufacturer and model.
-     *
-     * @param fsManufacturerAndModel the fs manufacturer and model
-     */
-    @DataBoundSetter
-    public void setFsManufacturerAndModel(String fsManufacturerAndModel) {
-        runFromFileModel.setFsManufacturerAndModel(fsManufacturerAndModel);
-    }
-
-    public String getFsLaunchAppName() {
-        return runFromFileModel.getFsLaunchAppName();
-    }
-
-    /**
-     * Sets fs launch app name.
-     *
-     * @param fsLaunchAppName the fs launch app name
-     */
-    @DataBoundSetter
-    public void setFsLaunchAppName(String fsLaunchAppName) {
-        runFromFileModel.setFsLaunchAppName(fsLaunchAppName);
-    }
-
-    public ProxySettings getProxySettings() {
-        return runFromFileModel.getProxySettings();
-    }
-
-    /**
-     * Sets proxy settings.
-     *
-     * @param proxySettings the proxy settings
-     */
-    @DataBoundSetter
-    public void setProxySettings(ProxySettings proxySettings) {
-        runFromFileModel.setProxySettings(proxySettings);
-    }
-
-    public String getFsTargetLab() {
-        return runFromFileModel.getFsTargetLab();
-    }
-
-    public AuthModel getAuthModel() {
-        return runFromFileModel.getAuthModel();
-    }
-
-    @DataBoundSetter
-    public void setAuthModel(AuthModel authModel) {
-        runFromFileModel.setAuthModel(authModel);
-    }
-
-    /**
-     * Sets fs target lab.
-     *
-     * @param fsTargetLab the fs target lab
-     */
-    @DataBoundSetter
-    public void setFsTargetLab(String fsTargetLab) {
-        runFromFileModel.setFsTargetLab(fsTargetLab);
-    }
-
-    public boolean getUseSSL() {
-        return runFromFileModel.isUseSSL();
+        runFromServiceModel.setFsTests(fsTests);
     }
 
     /**
@@ -589,7 +153,7 @@ public class RunFromService extends Builder implements SimpleBuildStep {
      * @return the filesystem report path
      */
     public String getFsReportPath() {
-        return runFromFileModel.getFsReportPath();
+        return runFromServiceModel.getFsReportPath();
     }
 
     /**
@@ -599,23 +163,9 @@ public class RunFromService extends Builder implements SimpleBuildStep {
      */
     @DataBoundSetter
     public void setFsReportPath(String fsReportPath) {
-        runFromFileModel.setFsReportPath(fsReportPath);
+        runFromServiceModel.setFsReportPath(fsReportPath);
     }
 
-    public String getOutEncoding() { return runFromFileModel.getOutEncoding(); }
-
-    @DataBoundSetter
-    public void setOutEncoding(String encoding) { runFromFileModel.setOutEncoding(encoding); }
-
-    /**
-     * Sets mc server name.
-     *
-     * @param useSSL the mc server name
-     */
-    @DataBoundSetter
-    public void setuseSSL(boolean useSSL) {
-        runFromFileModel.setUseSSL(useSSL);
-    }
 
     public Map<Long, String> getResultFileNames() {
         return resultFileNames;
@@ -633,8 +183,6 @@ public class RunFromService extends Builder implements SimpleBuildStep {
         PrintStream out = listener.getLogger();
 
         UftOctaneUtils.setUFTRunnerTypeAsParameter(build, listener);
-        // get the mc server settings
-        MCServerSettingsModel mcServerSettingsModel = getMCServerSettingsModel();
 
         EnvVars env = null;
         try {
@@ -666,39 +214,9 @@ public class RunFromService extends Builder implements SimpleBuildStep {
         // .md#variable-substitutions
 
         JSONObject jobDetails;
-        String mcServerUrl;
         // now merge them into one list
         Properties mergedProperties = new Properties();
-        if (mcServerSettingsModel != null) {
-            mcServerUrl = mcServerSettingsModel.getProperties().getProperty("MobileHostAddress");
-            jobDetails = runFromFileModel.getJobDetails(mcServerUrl);
 
-            mergedProperties.setProperty("mobileinfo", jobDetails != null ? jobDetails.toJSONString() : "");
-            mergedProperties.setProperty("MobileHostAddress", mcServerUrl);
-        }
-
-        // check whether Mobile authentication info is given or not
-        String plainTextPwd = runFromFileModel.getMcPassword() == null ? null : Secret.fromString(runFromFileModel.getMcPassword()).getPlainText();
-        String plainTextToken = runFromFileModel.getMcExecToken() == null ? null : Secret.fromString(runFromFileModel.getMcExecToken()).getPlainText();
-        if (StringUtils.isNotBlank(plainTextPwd)) {
-            try {
-                String encPassword = EncryptionUtils.encrypt(plainTextPwd, currNode);
-                mergedProperties.put("MobilePassword", encPassword);
-            } catch (Exception e) {
-                build.setResult(Result.FAILURE);
-                listener.fatalError("Problem in UFT Mobile password encryption: " + e.getMessage() + ".");
-                return;
-            }
-        } else if (StringUtils.isNotBlank(plainTextToken)) {
-            try {
-                String encToken = EncryptionUtils.encrypt(plainTextToken, currNode);
-                mergedProperties.put("MobileExecToken", encToken);
-            } catch (Exception e) {
-                build.setResult(Result.FAILURE);
-                listener.fatalError("Problem in UFT Mobile execution token encryption: " + e.getMessage() + ".");
-                return;
-            }
-        }
 
         if (env == null) {
             listener.fatalError("Environment not set");
@@ -709,7 +227,7 @@ public class RunFromService extends Builder implements SimpleBuildStep {
             VariableResolver<String> varResolver = ((AbstractBuild) build).getBuildVariableResolver();
         }
 
-        mergedProperties.putAll(Objects.requireNonNull(runFromFileModel).getProperties(env, currNode));
+        mergedProperties.putAll(Objects.requireNonNull(runFromServiceModel).getProperties(env, currNode));
 
         if (areParametersEnabled) {
             try {
@@ -770,41 +288,6 @@ public class RunFromService extends Builder implements SimpleBuildStep {
 
         mergedProperties.put("resultsFilename", ResultFilename);
 
-        // parallel runner is enabled
-        if (isParallelRunnerEnabled) {
-            // add the parallel runner properties
-            fileSystemTestSetModel.addTestSetProperties(mergedProperties, env);
-
-            // we need to replace each mtbx test with mtbx file path
-            for (int index = 1; index < this.fileSystemTestSetModel.getFileSystemTestSet().size(); index++) {
-                String key = "Test" + index;
-                String content = mergedProperties.getProperty(key + index, "");
-                try {
-                    replaceTestWithMtbxFile(workspace, mergedProperties, content, key, time, index);
-                } catch (Exception e) {
-                    build.setResult(Result.FAILURE);
-                    listener.error("Failed to save MTBX file : " + e.getMessage());
-                }
-            }
-        } else {
-            // handling mtbx file content :
-            // If we have mtbx content - it is located in Test1 property and there is no other test properties (like
-            // Test2 etc)
-            // We save mtbx content in workspace and replace content of Test1 by reference to saved file
-            // this only applies to the normal file system flow
-            String firstTestKey = "Test1";
-            String firstTestContent = mergedProperties.getProperty(firstTestKey, "");
-            try {
-                replaceTestWithMtbxFile(workspace, mergedProperties, firstTestContent, firstTestKey, time);
-            } catch (Exception e) {
-                build.setResult(Result.FAILURE);
-                listener.error("Failed to save MTBX file : " + e.getMessage());
-            }
-        }
-
-        if (uftSettingsModel != null) {
-            uftSettingsModel.addToProperties(mergedProperties);
-        }
 
         // cleanup report folders before running the build
         String selectedNode = env.get("NODE_NAME");
@@ -897,7 +380,7 @@ public class RunFromService extends Builder implements SimpleBuildStep {
 
         try {
             // Run the HpToolsLauncher.exe
-            AlmToolsUtils.runOnBuildEnv(build, launcher, listener, CmdLineExe, ParamFileName, currNode, runFromFileModel.getOutEncoding());
+            AlmToolsUtils.runOnBuildEnv(build, launcher, listener, CmdLineExe, ParamFileName, currNode);
             // Has the report been successfully generated?
         } catch (IOException ioe) {
             Util.displayIOException(ioe, listener);
@@ -917,22 +400,6 @@ public class RunFromService extends Builder implements SimpleBuildStep {
         }
     }
 
-    /**
-     * Gets mc server settings model.
-     *
-     * @return the mc server settings model
-     */
-    public MCServerSettingsModel getMCServerSettingsModel() {
-        for (MCServerSettingsModel mcServer : getDescriptor().getMcServers()) {
-            if (this.runFromFileModel != null
-                    && runFromFileModel.getMcServerName() != null
-                    && mcServer.getMcServerName() != null
-                    && runFromFileModel.getMcServerName().equals(mcServer.getMcServerName())) {
-                return mcServer;
-            }
-        }
-        return null;
-    }
 
     @Override
     public DescriptorImpl getDescriptor() {
@@ -944,8 +411,8 @@ public class RunFromService extends Builder implements SimpleBuildStep {
      *
      * @return the run from file model
      */
-    public RunFromFileSystemModel getRunFromFileModel() {
-        return runFromFileModel;
+    public RunFromServiceModel getrunFromServiceModel() {
+        return runFromServiceModel;
     }
 
     /**
@@ -961,29 +428,13 @@ public class RunFromService extends Builder implements SimpleBuildStep {
         }
     }
 
-    public boolean isAreParametersEnabled() {
-        return areParametersEnabled;
-    }
-
-    public void setAreParametersEnabled(boolean areParametersEnabled) {
-        this.areParametersEnabled = areParametersEnabled;
-    }
-
-    public SpecifyParametersModel getSpecifyParametersModel() {
-        return specifyParametersModel;
-    }
 
     /**
      * The type Descriptor.
      */
-    @Symbol("runFromFSBuilder")
+    @Symbol("runFromServiceBuilder")
     @Extension
     public static final class DescriptorImpl extends BuildStepDescriptor<Builder> {
-
-        /**
-         * The Instance.
-         */
-        JobConfigurationProxy instance = JobConfigurationProxy.getInstance();
 
         /**
          * Instantiates a new Descriptor.
@@ -998,70 +449,6 @@ public class RunFromService extends Builder implements SimpleBuildStep {
             return true;
         }
 
-        /**
-         * Gets job id.
-         * If there is already a job created by jenkins plugin, and exists then return this job id,
-         * otherwise, create a new temp job and return the new job id.
-         *
-         * @param mcUrl         the mc url
-         * @param mcUserName    the mc user name
-         * @param mcPassword    the mc password
-         * @param proxyAddress  the proxy address
-         * @param proxyUserName the proxy user name
-         * @param proxyPassword the proxy password
-         * @param previousJobId the previous job id
-         * @return the job id
-         */
-        @JavaScriptMethod
-        public String getJobId(String mcUrl, String mcUserName, String mcPassword, String mcTenantId, String mcExecToken, String authType,
-                               boolean fsUseAuthentication, String proxyAddress, String proxyUserName, String proxyPassword, String previousJobId) {
-            AuthModel authModel = new AuthModel(mcUserName, mcPassword, mcTenantId, mcExecToken, authType);
-            ProxySettings proxy = new ProxySettings(fsUseAuthentication, proxyAddress, proxyUserName, proxyPassword);
-            if (null != previousJobId && !previousJobId.isEmpty()) {
-                JSONObject jobJSON = instance.getJobById(mcUrl, authModel, proxy, previousJobId);
-                if (jobJSON != null && previousJobId.equals(jobJSON.getAsString("id"))) {
-                    return previousJobId;
-                } else {
-                    return instance.createTempJob(mcUrl, authModel, proxy);
-                }
-            }
-            return instance.createTempJob(mcUrl, authModel, proxy);
-        }
-
-        /**
-         * Populate app and device json object.
-         *
-         * @param mcUrl the mc url
-         * @param jobId the job id
-         * @return the json object
-         */
-        @JavaScriptMethod
-        public JSONObject populateAppAndDevice(String mcUrl, String mcUserName, String mcPassword, String mcTenantId, String mcExecToken, String authType,
-                                               boolean fsUseAuthentication, String proxyAddress, String proxyUserName, String proxyPassword,
-                                               String jobId) {
-            AuthModel authModel = new AuthModel(mcUserName, mcPassword, mcTenantId, mcExecToken, authType);
-            ProxySettings proxy = new ProxySettings(fsUseAuthentication, proxyAddress, proxyUserName, proxyPassword);
-            return instance.getJobJSONData(mcUrl, authModel, proxy, jobId);
-        }
-
-        /**
-         * Gets mc server url.
-         *
-         * @param serverName the server name
-         * @return the mc server url
-         */
-        @SuppressWarnings("squid:S2259")
-        @JavaScriptMethod
-        public String getMcServerUrl(String serverName) {
-            String serverUrl = "";
-            MCServerSettingsModel[] servers = MCServerSettingsGlobalConfiguration.getInstance().getInstallations();
-            for (MCServerSettingsModel mcServer : servers) {
-                if (mcServer.getMcServerName().equals(serverName)) {
-                    serverUrl = mcServer.getMcServerUrl();
-                }
-            }
-            return serverUrl;
-        }
 
         @Override
         public String getDisplayName() {
@@ -1076,6 +463,7 @@ public class RunFromService extends Builder implements SimpleBuildStep {
          */
         @SuppressWarnings("squid:S1172")
         public FormValidation doCheckFsTests(@QueryParameter String value) {
+            //TODO
             return FormValidation.ok();
         }
 
@@ -1115,74 +503,6 @@ public class RunFromService extends Builder implements SimpleBuildStep {
             return FormValidation.ok();
         }
 
-        /**
-         * Has mc servers boolean.
-         *
-         * @return the boolean
-         */
-        @SuppressWarnings("squid:S2259")
-        public boolean hasMCServers() {
-            return MCServerSettingsGlobalConfiguration.getInstance().hasMCServers();
-        }
-
-        /**
-         * Get mc servers mc server settings model [ ].
-         *
-         * @return the mc server settings model [ ]
-         */
-        @SuppressWarnings("squid:S2259")
-
-        public MCServerSettingsModel[] getMcServers() {
-            MCServerSettingsModel emptySrv = new MCServerSettingsModel("", "");
-            MCServerSettingsModel[] servers = MCServerSettingsGlobalConfiguration.getInstance().getInstallations();
-            if (servers == null) {
-                servers = new MCServerSettingsModel[0];
-            }
-            int nbOfServers = servers.length;
-            MCServerSettingsModel[] all = new MCServerSettingsModel[nbOfServers + 1];
-            all[0] = emptySrv;
-            for (int i = 0; i < servers.length; i++) {
-                all[i + 1] = servers[i];
-            }
-            return all;
-        }
-
-        /**
-         * Do check controller polling interval form validation.
-         *
-         * @param value the value
-         * @return the form validation
-         */
-        public FormValidation doCheckControllerPollingInterval(@QueryParameter String value) {
-            if (StringUtils.isEmpty(value)) {
-                return FormValidation.ok();
-            }
-
-            if (!StringUtils.isNumeric(value)) {
-                return FormValidation.error("Controller Polling Interval must be a number");
-            }
-
-            return FormValidation.ok();
-        }
-
-        /**
-         * Do check per scenario time out form validation.
-         *
-         * @param value the value
-         * @return the form validation
-         */
-        public FormValidation doCheckPerScenarioTimeOut(@QueryParameter String value) {
-            if (StringUtils.isEmpty(value)) {
-                return FormValidation.ok();
-            }
-
-            if (!isParameterizedValue(value) && !StringUtils.isNumeric(value)) {
-                return FormValidation.error("Per Scenario Timeout must be a parameter or a number, e.g.: 23, " +
-                        "$ScenarioDuration or ${ScenarioDuration}.");
-            }
-
-            return FormValidation.ok();
-        }
 
         /**
          * Check if the value is parameterized.
@@ -1195,19 +515,12 @@ public class RunFromService extends Builder implements SimpleBuildStep {
             return value.matches("^\\$\\{[\\w-. ]*}$|^\\$[\\w-.]*$");
         }
 
-        public List<EnumDescription> getFsUftRunModes() {
-            return RunFromFileSystemModel.fsUftRunModes;
-        }
-
-        public List<EnumDescription> getFsTestTypes() {
-            return UftSettingsModel.fsTestTypes;
-        }
 
         public List<String> getNodes() {
             return UftToolUtils.getNodesList();
         }
 
-        public List<String> getEncodings() { return RunFromFileSystemModel.encodings; }
+        // public List<String> getEncodings() { return RunFromServiceModel.encodings; }
     }
 
 }

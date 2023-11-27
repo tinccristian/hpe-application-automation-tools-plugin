@@ -1,13 +1,13 @@
 <!--
   ~ Certain versions of software and/or documents ("Material") accessible here may contain branding from
   ~ Hewlett-Packard Company (now HP Inc.) and Hewlett Packard Enterprise Company.  As of September 1, 2017,
-  ~ the Material is now offered by Micro Focus, a separately owned and operated company.  Any reference to the HP
+  ~ the Material is now offered by OpenText, a separately owned and operated company.  Any reference to the HP
   ~ and Hewlett Packard Enterprise/HPE marks is historical in nature, and the HP and Hewlett Packard Enterprise/HPE
   ~ marks are the property of their respective owners.
   ~ __________________________________________________________________
   ~ MIT License
   ~
-  ~ (c) Copyright 2012-2023 Micro Focus or one of its affiliates.
+  ~ (c) Copyright 2012-2024 OpenText or one of its affiliates.
   ~
   ~ Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
   ~ documentation files (the "Software"), to deal in the Software without restriction, including without limitation
@@ -29,7 +29,6 @@
 <?jelly escape-by-default='true'?>
 <j:jelly xmlns:j="jelly:core" xmlns:st="jelly:stapler" xmlns:d="jelly:define" xmlns:l="/lib/layout" xmlns:t="/lib/hudson" xmlns:f="/lib/form" xmlns:cv="/lib/custom">
 	 <script type="text/javascript" src="${rootURL}/plugin/hp-application-automation-tools-plugin/configure.js"/>
-	 <script type="text/javascript" src="${rootURL}/plugin/hp-application-automation-tools-plugin/parallelRunnerEnvironment.js"/>
 	 <script type="text/javascript" src="${rootURL}/plugin/hp-application-automation-tools-plugin/js/fileSystemUtils.js"/>
 	 <style>
 		#testsTable {
@@ -56,11 +55,6 @@
 
 		td.help-text {
 			padding-left: 15px;
-		}
-
-		input[name="isParallelRunnerEnabled"],
-		 input[name="areParametersEnabled"] {
-			margin-left: 35px;
 		}
 
 		table tr td div.help {
@@ -109,24 +103,18 @@
 	  </td>
 	  <td/>
 	</tr>
-
+	<div name="runFromSm">
 	<f:entry title="Scenario path" field="fsTests">
-		<f:textbox name="runfromfs.fsTests" value="${instance.runFromFileModel.fsTests}"/>
+		<f:textbox name="fsTests" value="${instance.runFromServiceModel.fsTests}"/>
 	</f:entry>
-
-	<st:bind var="fsTests" value="${instance.runFromFileModel.fsTests}"/>
-	<st:bind var="cleanupTests" value="${instance.runFromFileModel.cleanupTests}"/>
 	
 	<f:entry title="Results directory" field="fsReportPath">
-		<f:textbox name="runfromfs.fsReportPath" value="${instance.runFromFileModel.fsReportPath}"/>
+		<f:textbox name="fsReportPath" value="${instance.runFromServiceModel.fsReportPath}"/>
 	</f:entry>
 
 	<f:entry title="Client timeout (seconds)" field="fsTimeout">
-		<f:textbox name="runfromfs.fsTimeout" value="${instance.runFromFileModel.fsTimeout}"/>
+		<f:textbox name="fsTimeout" value="${instance.runFromServiceModel.fsTimeout}"/>
 	</f:entry>
+	</div>
 
-	<script type="text/javascript">
-		checkIfPipelineAndUpdateHelpMsg("${%DontForgetThePublisherPipeline}");
-		setupFsTask();
-	</script>
 </j:jelly>
