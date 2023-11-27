@@ -1,28 +1,32 @@
 /*
- * Certain versions of software and/or documents ("Material") accessible here may contain branding from
- * Hewlett-Packard Company (now HP Inc.) and Hewlett Packard Enterprise Company.  As of September 1, 2017,
- * the Material is now offered by Micro Focus, a separately owned and operated company.  Any reference to the HP
- * and Hewlett Packard Enterprise/HPE marks is historical in nature, and the HP and Hewlett Packard Enterprise/HPE
- * marks are the property of their respective owners.
+ * Certain versions of software accessible here may contain branding from Hewlett-Packard Company (now HP Inc.) and Hewlett Packard Enterprise Company.
+ * This software was acquired by Micro Focus on September 1, 2017, and is now offered by OpenText.
+ * Any reference to the HP and Hewlett Packard Enterprise/HPE marks is historical in nature, and the HP and Hewlett Packard Enterprise/HPE marks are the property of their respective owners.
  * __________________________________________________________________
  * MIT License
  *
- * (c) Copyright 2012-2023 Micro Focus or one of its affiliates.
+ * Copyright 2012-2023 Open Text
  *
- * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
- * documentation files (the "Software"), to deal in the Software without restriction, including without limitation
- * the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software,
- * and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+ * The only warranties for products and services of Open Text and
+ * its affiliates and licensors ("Open Text") are as may be set forth
+ * in the express warranty statements accompanying such products and services.
+ * Nothing herein should be construed as constituting an additional warranty.
+ * Open Text shall not be liable for technical or editorial errors or
+ * omissions contained herein. The information contained herein is subject
+ * to change without notice.
  *
- * The above copyright notice and this permission notice shall be included in all copies or
- * substantial portions of the Software.
+ * Except as specifically indicated otherwise, this document contains
+ * confidential information and a valid license is required for possession,
+ * use or copying. If this work is provided to the U.S. Government,
+ * consistent with FAR 12.211 and 12.212, Commercial Computer Software,
+ * Computer Software Documentation, and Technical Data for Commercial Items are
+ * licensed to the U.S. Government under vendor's standard commercial license.
  *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
- * THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
- * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
- *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  * ___________________________________________________________________
  */
 
@@ -38,12 +42,14 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading;
 using Resources = HpToolsLauncher.Properties.Resources;
+using AuthType = HpToolsLauncher.McConnectionInfo.AuthType;
 
 namespace HpToolsLauncher
 {
     public class GuiTestRunner : IFileSysTestRunner
     {
         // Setting keys for mobile
+        private const string MC_TYPE = "MobileCenterType";
         private const string MOBILE_HOST_ADDRESS = "ALM_MobileHostAddress";
         private const string MOBILE_HOST_PORT = "ALM_MobileHostPort";
         private const string MOBILE_USER = "ALM_MobileUserName";
@@ -54,6 +60,7 @@ namespace HpToolsLauncher
         private const string MOBILE_TENANT = "EXTERNAL_MobileTenantId";
         private const string MOBILE_USE_SSL = "ALM_MobileUseSSL";
         private const string MOBILE_USE_PROXY = "EXTERNAL_MobileProxySetting_UseProxy";
+        private const string MOBILE_PROXY_SETTING = "EXTERNAL_MobileProxySetting";
         private const string MOBILE_PROXY_SETTING_ADDRESS = "EXTERNAL_MobileProxySetting_Address";
         private const string MOBILE_PROXY_SETTING_PORT = "EXTERNAL_MobileProxySetting_Port";
         private const string MOBILE_PROXY_SETTING_AUTHENTICATION = "EXTERNAL_MobileProxySetting_Authentication";
@@ -67,7 +74,12 @@ namespace HpToolsLauncher
         private const string RUNNING = "Running";
         private const string PASSED = "Passed";
         private const string WARNING = "Warning";
-        private const int DISP_E_MEMBERNOTFOUND = -2147352573;
+        private const int MEMBER_NOT_FOUND = -2147352573;
+        private const string PROTECT_BstrToBase64_FAILED = "ProtectBSTRToBase64 failed for {0}.";
+        private const string WEB = "Web";
+        private const string CLOUD_BROWSER = "CloudBrowser";
+        private const string SYSTEM_PROXY = "System Proxy";
+        private const string HTTP_PROXY = "HTTP Proxy";
 
         private readonly Type _qtType = Type.GetTypeFromProgID("Quicktest.Application");
         private readonly IAssetRunner _runNotifier;
@@ -82,6 +94,7 @@ namespace HpToolsLauncher
         private RunCancelledDelegate _runCancelled;
         private McConnectionInfo _mcConnection;
         private string _mobileInfo;
+        private CloudBrowser _cloudBrowser;
         private bool _printInputParams;
         private bool _isCancelledByUser;
         private RunAsUser _uftRunAsUser;
@@ -92,15 +105,16 @@ namespace HpToolsLauncher
         /// <param name="runNotifier"></param>
         /// <param name="useUftLicense"></param>
         /// <param name="timeLeftUntilTimeout"></param>
-        public GuiTestRunner(IAssetRunner runNotifier, bool useUftLicense, TimeSpan timeLeftUntilTimeout, string uftRunMode, McConnectionInfo mcConnectionInfo, string mobileInfo, bool printInputParams, RunAsUser uftRunAsUser)
+        public GuiTestRunner(IAssetRunner runNotifier, bool useUftLicense, TimeSpan timeLeftUntilTimeout, string uftRunMode, DigitalLab digitalLab, bool printInputParams, RunAsUser uftRunAsUser)
         {
             _timeLeftUntilTimeout = timeLeftUntilTimeout;
             _uftRunMode = uftRunMode;
             _stopwatch = Stopwatch.StartNew();
             _runNotifier = runNotifier;
             _useUFTLicense = useUftLicense;
-            _mcConnection = mcConnectionInfo;
-            _mobileInfo = mobileInfo;
+            _mcConnection = digitalLab.ConnectionInfo;
+            _mobileInfo = digitalLab.MobileInfo;
+            _cloudBrowser = digitalLab.CloudBrowser;
             _printInputParams = printInputParams;
             _uftRunAsUser = uftRunAsUser;
         }
@@ -158,6 +172,7 @@ namespace HpToolsLauncher
                 return runDesc;
             }
 
+            Version qtpVersion;
             try
             {
                 lock (_lockObject)
@@ -167,11 +182,16 @@ namespace HpToolsLauncher
                     {
                         try
                         {
+                            if (_qtpApplication.Launched)
+                            {
+                                QTPTestCleanup();
+                                CleanUpAndKillQtp();
+                            }
                             _qtpApplication.LaunchAsUser(_uftRunAsUser.Username, _uftRunAsUser.EncodedPassword);
                         }
                         catch (COMException e)
                         {
-                            if (e.ErrorCode == DISP_E_MEMBERNOTFOUND)
+                            if (e.ErrorCode == MEMBER_NOT_FOUND)
                             {
                                 errorReason = Resources.UftLaunchAsUserNotSupported;
                             }
@@ -183,7 +203,7 @@ namespace HpToolsLauncher
                         }
                     }
 
-                    Version qtpVersion = Version.Parse(_qtpApplication.Version);
+                    qtpVersion = Version.Parse(_qtpApplication.Version);
                     if (qtpVersion.Equals(new Version(11, 0)))
                     {
                         runDesc.ReportLocation = GetReportLocation(testinf, testPath);
@@ -222,6 +242,9 @@ namespace HpToolsLauncher
                     runDesc.ErrorDesc = errorReason;
                     ConsoleWriter.WriteErrLine(errorReason);
                 }
+#if DEBUG
+                ConsoleWriter.WriteException(e);
+#endif
                 runDesc.TestState = TestState.Error;
                 runDesc.ReportLocation = string.Empty;
                 return runDesc;
@@ -245,12 +268,20 @@ namespace HpToolsLauncher
             }
             catch (ArgumentException)
             {
-                ConsoleWriter.WriteErrLine(string.Format(Resources.FsDuplicateParamNames));
+                ConsoleWriter.WriteErrLine(Resources.FsDuplicateParamNames);
                 throw;
             }
 
             if (!HandleInputParameters(testPath, ref errorReason, paramDict, testinf))
             {
+                runDesc.TestState = TestState.Error;
+                runDesc.ErrorDesc = errorReason;
+                return runDesc;
+            }
+
+            if (!HandleCloudBrowser(qtpVersion, ref errorReason))
+            {
+                ConsoleWriter.WriteErrLine(errorReason);
                 runDesc.TestState = TestState.Error;
                 runDesc.ErrorDesc = errorReason;
                 return runDesc;
@@ -301,79 +332,82 @@ namespace HpToolsLauncher
 
             #region Mc connection and other mobile info
 
+            ITDPierToTulip tulip = _qtpApplication.TDPierToTulip;
             // Mc Address, username and password
-            if (!string.IsNullOrEmpty(_mcConnection.HostAddress))
+            if (!_mcConnection.HostAddress.IsNullOrEmpty())
             {
-                _qtpApplication.TDPierToTulip.SetTestOptionsVal(MOBILE_HOST_ADDRESS, _mcConnection.HostAddress);
-                if (!string.IsNullOrEmpty(_mcConnection.HostPort))
+                tulip.SetTestOptionsVal(MC_TYPE, (int)_mcConnection.LabType);
+
+                tulip.SetTestOptionsVal(MOBILE_HOST_ADDRESS, _mcConnection.HostAddress);
+                if (!_mcConnection.HostPort.IsNullOrEmpty())
                 {
-                    _qtpApplication.TDPierToTulip.SetTestOptionsVal(MOBILE_HOST_PORT, _mcConnection.HostPort);
+                    tulip.SetTestOptionsVal(MOBILE_HOST_PORT, _mcConnection.HostPort);
                 }
-            }
 
-            var mcAuthType = _mcConnection.MobileAuthType;
-            switch (mcAuthType)
-            {
-                case McConnectionInfo.AuthType.AuthToken:
-                    var token = _mcConnection.GetAuthToken();
+                AuthType mcAuthType = _mcConnection.MobileAuthType;
+                switch (mcAuthType)
+                {
+                    case AuthType.AuthToken:
+                        var token = _mcConnection.GetAuthToken();
 
-                    _qtpApplication.TDPierToTulip.SetTestOptionsVal(MOBILE_CLIENTID, token.ClientId);
-                    _qtpApplication.TDPierToTulip.SetTestOptionsVal(MOBILE_SECRET, token.SecretKey);
+                        tulip.SetTestOptionsVal(MOBILE_CLIENTID, token.ClientId);
+                        tulip.SetTestOptionsVal(MOBILE_SECRET, token.SecretKey);
 
-                    break;
-                case McConnectionInfo.AuthType.UsernamePassword:
-                    if (!string.IsNullOrEmpty(_mcConnection.UserName))
-                    {
-                        _qtpApplication.TDPierToTulip.SetTestOptionsVal(MOBILE_USER, _mcConnection.UserName);
-                    }
-
-                    if (!string.IsNullOrEmpty(_mcConnection.Password))
-                    {
-                        string encriptedMcPassword = WinUserNativeMethods.ProtectBSTRToBase64(_mcConnection.Password);
-                        if (encriptedMcPassword == null)
+                        break;
+                    case AuthType.UsernamePassword:
+                        if (!_mcConnection.UserName.IsNullOrEmpty())
                         {
-                            ConsoleWriter.WriteLine("ProtectBSTRToBase64 fail for mcPassword");
-                            throw new Exception("ProtectBSTRToBase64 fail for mcPassword");
+                            tulip.SetTestOptionsVal(MOBILE_USER, _mcConnection.UserName);
                         }
-                        _qtpApplication.TDPierToTulip.SetTestOptionsVal(MOBILE_PASSWORD, encriptedMcPassword);
-                    }
-                    break;
-            }
 
-            // set authentication type
-            _qtpApplication.TDPierToTulip.SetTestOptionsVal(MOBILE_AUTH_TYPE, mcAuthType);
-
-            // set tenantID
-            if (!string.IsNullOrEmpty(_mcConnection.TenantId))
-            {
-                _qtpApplication.TDPierToTulip.SetTestOptionsVal(MOBILE_TENANT, _mcConnection.TenantId);
-            }
-
-            // ssl and proxy info
-            _qtpApplication.TDPierToTulip.SetTestOptionsVal(MOBILE_USE_SSL, _mcConnection.UseSslAsInt);
-
-            if (_mcConnection.UseProxy)
-            {
-                _qtpApplication.TDPierToTulip.SetTestOptionsVal(MOBILE_USE_PROXY, _mcConnection.UseProxyAsInt);
-                _qtpApplication.TDPierToTulip.SetTestOptionsVal(MOBILE_PROXY_SETTING_ADDRESS, _mcConnection.ProxyAddress);
-                _qtpApplication.TDPierToTulip.SetTestOptionsVal(MOBILE_PROXY_SETTING_PORT, _mcConnection.ProxyPort);
-                _qtpApplication.TDPierToTulip.SetTestOptionsVal(MOBILE_PROXY_SETTING_AUTHENTICATION, _mcConnection.ProxyAuth);
-                _qtpApplication.TDPierToTulip.SetTestOptionsVal(MOBILE_PROXY_SETTING_USERNAME, _mcConnection.ProxyUserName);
-                string encriptedMcProxyPassword = WinUserNativeMethods.ProtectBSTRToBase64(_mcConnection.ProxyPassword);
-                if (encriptedMcProxyPassword == null)
-                {
-                    ConsoleWriter.WriteLine("ProtectBSTRToBase64 fail for mc proxy Password");
-                    throw new Exception("ProtectBSTRToBase64 fail for mc proxy Password");
+                        if (!_mcConnection.Password.IsNullOrEmpty())
+                        {
+                            string encriptedMcPassword = WinUserNativeMethods.ProtectBSTRToBase64(_mcConnection.Password);
+                            if (encriptedMcPassword == null)
+                            {
+                                ConsoleWriter.WriteLine(string.Format(PROTECT_BstrToBase64_FAILED, "DL Password"));
+                                throw new Exception(string.Format(PROTECT_BstrToBase64_FAILED, "DL Password"));
+                            }
+                            tulip.SetTestOptionsVal(MOBILE_PASSWORD, encriptedMcPassword);
+                        }
+                        break;
                 }
-                _qtpApplication.TDPierToTulip.SetTestOptionsVal(MOBILE_PROXY_SETTING_PASSWORD, encriptedMcProxyPassword);
-            }
 
-            // Mc info (device, app, launch and terminate data)
-            if (!string.IsNullOrEmpty(_mobileInfo))
-            {
-                _qtpApplication.TDPierToTulip.SetTestOptionsVal(MOBILE_INFO, _mobileInfo);
-            }
+                // set authentication type
+                tulip.SetTestOptionsVal(MOBILE_AUTH_TYPE, mcAuthType);
 
+                // set tenantID
+                if (!_mcConnection.TenantId.IsNullOrEmpty())
+                {
+                    tulip.SetTestOptionsVal(MOBILE_TENANT, _mcConnection.TenantId);
+                }
+
+                // ssl and proxy info
+                tulip.SetTestOptionsVal(MOBILE_USE_SSL, _mcConnection.UseSslAsInt);
+
+                if (_mcConnection.UseProxy)
+                {
+                    tulip.SetTestOptionsVal(MOBILE_USE_PROXY, _mcConnection.UseProxyAsInt);
+                    tulip.SetTestOptionsVal(MOBILE_PROXY_SETTING, _mcConnection.ProxyType == 1 ? SYSTEM_PROXY : HTTP_PROXY);
+                    tulip.SetTestOptionsVal(MOBILE_PROXY_SETTING_ADDRESS, _mcConnection.ProxyAddress);
+                    tulip.SetTestOptionsVal(MOBILE_PROXY_SETTING_PORT, _mcConnection.ProxyPort);
+                    tulip.SetTestOptionsVal(MOBILE_PROXY_SETTING_AUTHENTICATION, _mcConnection.UseProxyAuthAsInt);
+                    tulip.SetTestOptionsVal(MOBILE_PROXY_SETTING_USERNAME, _mcConnection.ProxyUserName);
+                    string encMcProxyPassword = WinUserNativeMethods.ProtectBSTRToBase64(_mcConnection.ProxyPassword);
+                    if (encMcProxyPassword == null)
+                    {
+                        ConsoleWriter.WriteLine(string.Format(PROTECT_BstrToBase64_FAILED, "DL Proxy Password"));
+                        throw new Exception(string.Format(PROTECT_BstrToBase64_FAILED, "DL Proxy Password"));
+                    }
+                    tulip.SetTestOptionsVal(MOBILE_PROXY_SETTING_PASSWORD, encMcProxyPassword);
+                }
+
+                // Mc info (device, app, launch and terminate data)
+                if (!string.IsNullOrEmpty(_mobileInfo))
+                {
+                    tulip.SetTestOptionsVal(MOBILE_INFO, _mobileInfo);
+                }
+            }
             #endregion
         }
 
@@ -726,6 +760,36 @@ namespace HpToolsLauncher
             return legal;
         }
 
+        private bool HandleCloudBrowser(Version qtpVersion, ref string errorReason)
+        {
+            if (_cloudBrowser != null)
+            {
+                if (qtpVersion < new Version(2023, 4))
+                {
+                    errorReason = string.Format(Resources.CloudBrowserNotSupported, qtpVersion.ToString(2));
+                    return false;
+                }
+                try
+                {
+                    var launcher = _qtpApplication.Test.Settings.Launchers[WEB];
+                    launcher.Active = true;
+                    launcher.SetLab(CLOUD_BROWSER);
+                    if (!_cloudBrowser.Url.IsNullOrWhiteSpace())
+                        launcher.Address = _cloudBrowser.Url;
+                    launcher.CloudBrowser.OS = _cloudBrowser.OS;
+                    launcher.CloudBrowser.Browser = _cloudBrowser.Browser;
+                    launcher.CloudBrowser.BrowserVersion = _cloudBrowser.Version;
+                    launcher.CloudBrowser.Location = _cloudBrowser.Region;
+                }
+                catch (Exception ex) 
+                {
+                    errorReason = ex.Message;
+                    return false;
+                }
+            }
+            return true;
+        }
+
         private bool HandleInputParameters(string fileName, ref string errorReason, Dictionary<string, object> inputParams, TestInfo testInfo)
         {
             try
@@ -881,7 +945,7 @@ namespace HpToolsLauncher
             return localKey;
         }
 
-        #endregion
+#endregion
 
         /// <summary>
         /// holds the resutls for a GUI test

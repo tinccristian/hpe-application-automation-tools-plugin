@@ -1,33 +1,38 @@
 /*
- * Certain versions of software and/or documents ("Material") accessible here may contain branding from
- * Hewlett-Packard Company (now HP Inc.) and Hewlett Packard Enterprise Company.  As of September 1, 2017,
- * the Material is now offered by Micro Focus, a separately owned and operated company.  Any reference to the HP
- * and Hewlett Packard Enterprise/HPE marks is historical in nature, and the HP and Hewlett Packard Enterprise/HPE
- * marks are the property of their respective owners.
+ * Certain versions of software accessible here may contain branding from Hewlett-Packard Company (now HP Inc.) and Hewlett Packard Enterprise Company.
+ * This software was acquired by Micro Focus on September 1, 2017, and is now offered by OpenText.
+ * Any reference to the HP and Hewlett Packard Enterprise/HPE marks is historical in nature, and the HP and Hewlett Packard Enterprise/HPE marks are the property of their respective owners.
  * __________________________________________________________________
  * MIT License
  *
- * (c) Copyright 2012-2023 Micro Focus or one of its affiliates.
+ * Copyright 2012-2023 Open Text
  *
- * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
- * documentation files (the "Software"), to deal in the Software without restriction, including without limitation
- * the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software,
- * and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+ * The only warranties for products and services of Open Text and
+ * its affiliates and licensors ("Open Text") are as may be set forth
+ * in the express warranty statements accompanying such products and services.
+ * Nothing herein should be construed as constituting an additional warranty.
+ * Open Text shall not be liable for technical or editorial errors or
+ * omissions contained herein. The information contained herein is subject
+ * to change without notice.
  *
- * The above copyright notice and this permission notice shall be included in all copies or
- * substantial portions of the Software.
+ * Except as specifically indicated otherwise, this document contains
+ * confidential information and a valid license is required for possession,
+ * use or copying. If this work is provided to the U.S. Government,
+ * consistent with FAR 12.211 and 12.212, Commercial Computer Software,
+ * Computer Software Documentation, and Technical Data for Commercial Items are
+ * licensed to the U.S. Government under vendor's standard commercial license.
  *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
- * THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
- * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
- *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  * ___________________________________________________________________
  */
 
 package com.microfocus.application.automation.tools.mc;
 
+import net.minidev.json.JSONArray;
 import net.minidev.json.JSONObject;
 import net.minidev.json.JSONValue;
 import org.apache.commons.lang.StringUtils;
@@ -35,6 +40,7 @@ import org.apache.commons.lang.StringUtils;
 import java.io.*;
 import java.net.*;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 
 public class HttpUtils {
@@ -47,10 +53,19 @@ public class HttpUtils {
     }
 
     public static HttpResponse doPost(ProxyInfo proxyInfo, String url, Map<String, String> headers, byte[] data) {
-
         HttpResponse response = null;
         try {
-            response = doHttp(proxyInfo, POST, url, null, headers, data);
+            response = doHttp(proxyInfo, POST, url, null, headers, data, false);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return response;
+    }
+
+    public static HttpResponse doPost(ProxyInfo proxyInfo, String url, Map<String, String> headers, byte[] data, boolean useCookieManager) {
+        HttpResponse response = null;
+        try {
+            response = doHttp(proxyInfo, POST, url, null, headers, data, useCookieManager);
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -58,18 +73,16 @@ public class HttpUtils {
     }
 
     public static HttpResponse doGet(ProxyInfo proxyInfo, String url, Map<String, String> headers, String queryString) {
-
         HttpResponse response = null;
         try {
-            response = doHttp(proxyInfo, GET, url, queryString, headers, null);
+            response = doHttp(proxyInfo, GET, url, queryString, headers, null, false);
         } catch (Exception e) {
             e.printStackTrace();
         }
         return response;
     }
 
-
-    private static HttpResponse doHttp(ProxyInfo proxyInfo, String requestMethod, String connectionUrl, String queryString, Map<String, String> headers, byte[] data) throws IOException {
+    private static HttpResponse doHttp(ProxyInfo proxyInfo, String requestMethod, String connectionUrl, String queryString, Map<String, String> headers, byte[] data, boolean useCookieManager) throws IOException {
         HttpResponse response = new HttpResponse();
 
         if ((queryString != null) && !queryString.isEmpty()) {
@@ -77,7 +90,11 @@ public class HttpUtils {
         }
 
         URL url = new URL(connectionUrl);
-
+        CookieManager cookieManager = null;
+        if (useCookieManager) {
+            cookieManager = new CookieManager();
+            CookieHandler.setDefault(cookieManager);
+        }
 
         HttpURLConnection connection = (HttpURLConnection) openConnection(proxyInfo, url);
 
@@ -103,12 +120,21 @@ public class HttpUtils {
 
         if (responseCode == HttpURLConnection.HTTP_OK) {
             InputStream inputStream = connection.getInputStream();
-            JSONObject jsonObject = convertStreamToJSONObject(inputStream);
+            Object object = convertStreamToObject(inputStream);
             response.setHeaders(connection.getHeaderFields());
-            if (null == jsonObject) {
+            if (null == object) {
                 System.out.println(requestMethod + " " + connectionUrl + " return is null.");
-            } else {
+            } else if (object instanceof JSONObject) {
+                response.setJsonObject((JSONObject) object);
+            } else if (object instanceof JSONArray) {
+                response.setJsonArray((JSONArray) object);
+            } else if(object instanceof Boolean){
+                JSONObject jsonObject = new JSONObject();
+                jsonObject.put("error", !((Boolean) object).booleanValue());
                 response.setJsonObject(jsonObject);
+            }
+            if (useCookieManager) {
+                response.setCookiesString(getCookiesString(cookieManager));
             }
         } else {
             System.out.println(requestMethod + " " + connectionUrl + " failed with response code:" + responseCode);
@@ -117,6 +143,19 @@ public class HttpUtils {
 
         return response;
     }
+
+    private static String getCookiesString(CookieManager cookieManager) {
+        StringBuilder ret = new StringBuilder();
+        if (cookieManager != null) {
+            List<HttpCookie> cookies = cookieManager.getCookieStore().getCookies();
+            for (HttpCookie cookie : cookies) {
+                //TODO review each cookie !!!!!!!!!!!!!!!!!!!!
+                ret.append(cookie.getName()).append("=").append(cookie.getValue()).append(";");
+            }
+        }
+        return ret.toString();
+    }
+
 
     private static URLConnection openConnection(final ProxyInfo proxyInfo, URL _url) throws IOException {
 
@@ -164,8 +203,8 @@ public class HttpUtils {
 
     }
 
-    private static JSONObject convertStreamToJSONObject(InputStream inputStream) {
-        JSONObject obj = null;
+    private static Object convertStreamToObject(InputStream inputStream) {
+        Object obj = null;
 
         if (inputStream != null) {
             try {
@@ -175,7 +214,7 @@ public class HttpUtils {
                 while ((line = reader.readLine()) != null) {
                     res.append(line);
                 }
-                obj = (JSONObject) JSONValue.parseStrict(res.toString());
+                obj = JSONValue.parseStrict(res.toString());
             } catch (ClassCastException e) {
                 System.out.println("WARN::INVALIDE JSON Object" + e.getMessage());
             } catch (Exception e) {

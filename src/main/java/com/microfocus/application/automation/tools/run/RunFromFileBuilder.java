@@ -1,28 +1,32 @@
 /*
- * Certain versions of software and/or documents ("Material") accessible here may contain branding from
- * Hewlett-Packard Company (now HP Inc.) and Hewlett Packard Enterprise Company.  As of September 1, 2017,
- * the Material is now offered by Micro Focus, a separately owned and operated company.  Any reference to the HP
- * and Hewlett Packard Enterprise/HPE marks is historical in nature, and the HP and Hewlett Packard Enterprise/HPE
- * marks are the property of their respective owners.
+ * Certain versions of software accessible here may contain branding from Hewlett-Packard Company (now HP Inc.) and Hewlett Packard Enterprise Company.
+ * This software was acquired by Micro Focus on September 1, 2017, and is now offered by OpenText.
+ * Any reference to the HP and Hewlett Packard Enterprise/HPE marks is historical in nature, and the HP and Hewlett Packard Enterprise/HPE marks are the property of their respective owners.
  * __________________________________________________________________
  * MIT License
  *
- * (c) Copyright 2012-2023 Micro Focus or one of its affiliates.
+ * Copyright 2012-2023 Open Text
  *
- * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
- * documentation files (the "Software"), to deal in the Software without restriction, including without limitation
- * the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software,
- * and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+ * The only warranties for products and services of Open Text and
+ * its affiliates and licensors ("Open Text") are as may be set forth
+ * in the express warranty statements accompanying such products and services.
+ * Nothing herein should be construed as constituting an additional warranty.
+ * Open Text shall not be liable for technical or editorial errors or
+ * omissions contained herein. The information contained herein is subject
+ * to change without notice.
  *
- * The above copyright notice and this permission notice shall be included in all copies or
- * substantial portions of the Software.
+ * Except as specifically indicated otherwise, this document contains
+ * confidential information and a valid license is required for possession,
+ * use or copying. If this work is provided to the U.S. Government,
+ * consistent with FAR 12.211 and 12.212, Commercial Computer Software,
+ * Computer Software Documentation, and Technical Data for Commercial Items are
+ * licensed to the U.S. Government under vendor's standard commercial license.
  *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
- * THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
- * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
- *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  * ___________________________________________________________________
  */
 
@@ -53,7 +57,7 @@ import jenkins.model.Jenkins;
 import jenkins.tasks.SimpleBuildStep;
 import net.minidev.json.JSONObject;
 import org.apache.commons.io.IOUtils;
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.jenkinsci.Symbol;
 import org.kohsuke.stapler.DataBoundConstructor;
 import org.kohsuke.stapler.DataBoundSetter;
@@ -596,6 +600,13 @@ public class RunFromFileBuilder extends Builder implements SimpleBuildStep {
         runFromFileModel.setFsReportPath(fsReportPath);
     }
 
+    public CloudBrowserModel getCloudBrowserModel() {
+        return runFromFileModel.getCloudBrowserModel();
+    }
+    @DataBoundSetter
+    public void setCloudBrowserModel(CloudBrowserModel cloudBrowserModel) {
+        runFromFileModel.setCloudBrowserModel(cloudBrowserModel);
+    }
     public String getOutEncoding() { return runFromFileModel.getOutEncoding(); }
 
     @DataBoundSetter
@@ -607,7 +618,7 @@ public class RunFromFileBuilder extends Builder implements SimpleBuildStep {
      * @param useSSL the mc server name
      */
     @DataBoundSetter
-    public void setuseSSL(boolean useSSL) {
+    public void setUseSSL(boolean useSSL) {
         runFromFileModel.setUseSSL(useSSL);
     }
 
@@ -669,6 +680,12 @@ public class RunFromFileBuilder extends Builder implements SimpleBuildStep {
 
             mergedProps.setProperty("mobileinfo", jobDetails != null ? jobDetails.toJSONString() : "");
             mergedProps.setProperty("MobileHostAddress", mcServerUrl);
+
+            CloudBrowserModel cbm = getCloudBrowserModel();
+            if (cbm != null) {
+                String cb = String.format("\"url=%s;os=%s;type=%s;version=%s;region=%s\"", cbm.getUrl(), cbm.getOs(), cbm.getType(), cbm.getVersion(), cbm.getRegion());
+                mergedProps.setProperty("cloudBrowser", cb);
+            }
         }
 
         // check whether Mobile authentication info is given or not
@@ -1006,10 +1023,10 @@ public class RunFromFileBuilder extends Builder implements SimpleBuildStep {
          * @return the job id
          */
         @JavaScriptMethod
-        public String getJobId(String mcUrl, String mcUserName, String mcPassword, String mcTenantId, String mcExecToken, String authType,
-                               boolean fsUseAuthentication, String proxyAddress, String proxyUserName, String proxyPassword, String previousJobId) {
-            AuthModel authModel = new AuthModel(mcUserName, mcPassword, mcTenantId, mcExecToken, authType);
-            ProxySettings proxy = new ProxySettings(fsUseAuthentication, proxyAddress, proxyUserName, proxyPassword);
+        public String getJobId(String mcUrl, String mcUserName, String mcPassword, String mcTenantId, String accessKey, String authType,
+                               boolean useProxyAuth, String proxyAddress, String proxyUserName, String proxyPassword, String previousJobId) {
+            AuthModel authModel = new AuthModel(mcUserName, mcPassword, mcTenantId, accessKey, authType);
+            ProxySettings proxy = new ProxySettings(useProxyAuth, proxyAddress, proxyUserName, proxyPassword);
             if (null != previousJobId && !previousJobId.isEmpty()) {
                 JSONObject jobJSON = instance.getJobById(mcUrl, authModel, proxy, previousJobId);
                 if (jobJSON != null && previousJobId.equals(jobJSON.getAsString("id"))) {
@@ -1029,11 +1046,11 @@ public class RunFromFileBuilder extends Builder implements SimpleBuildStep {
          * @return the json object
          */
         @JavaScriptMethod
-        public JSONObject populateAppAndDevice(String mcUrl, String mcUserName, String mcPassword, String mcTenantId, String mcExecToken, String authType,
-                                               boolean fsUseAuthentication, String proxyAddress, String proxyUserName, String proxyPassword,
+        public JSONObject populateAppAndDevice(String mcUrl, String mcUserName, String mcPassword, String mcTenantId, String accessKey, String authType,
+                                               boolean useProxyAuth, String proxyAddress, String proxyUserName, String proxyPassword,
                                                String jobId) {
-            AuthModel authModel = new AuthModel(mcUserName, mcPassword, mcTenantId, mcExecToken, authType);
-            ProxySettings proxy = new ProxySettings(fsUseAuthentication, proxyAddress, proxyUserName, proxyPassword);
+            AuthModel authModel = new AuthModel(mcUserName, mcPassword, mcTenantId, accessKey, authType);
+            ProxySettings proxy = new ProxySettings(useProxyAuth, proxyAddress, proxyUserName, proxyPassword);
             return instance.getJobJSONData(mcUrl, authModel, proxy, jobId);
         }
 
@@ -1050,10 +1067,22 @@ public class RunFromFileBuilder extends Builder implements SimpleBuildStep {
             MCServerSettingsModel[] servers = MCServerSettingsGlobalConfiguration.getInstance().getInstallations();
             for (MCServerSettingsModel mcServer : servers) {
                 if (mcServer.getMcServerName().equals(serverName)) {
-                    serverUrl = mcServer.getMcServerUrl();
+                    serverUrl = mcServer.getMcServerUrl().trim();
+                    break;
                 }
             }
             return serverUrl;
+        }
+
+        @JavaScriptMethod
+        public JSONObject getBrowserLab(String serverName, String accessKey, boolean useProxyAuth, String proxyAddr, String proxyUserName, String proxyPassword) {
+            String serverUrl = getMcServerUrl(serverName);
+            if (StringUtils.isNotBlank(serverUrl)) {
+                serverUrl = StringUtils.stripEnd(serverUrl, "/");
+                ProxySettings proxy = new ProxySettings(useProxyAuth, proxyAddr, proxyUserName, proxyPassword);
+                return instance.getBrowserLab(serverUrl, accessKey, proxy);
+            }
+            return null;
         }
 
         @Override
