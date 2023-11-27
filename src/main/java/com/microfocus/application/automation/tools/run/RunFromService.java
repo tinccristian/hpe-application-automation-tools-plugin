@@ -33,12 +33,8 @@ import com.microfocus.application.automation.tools.JenkinsUtils;
 import com.microfocus.application.automation.tools.AlmToolsUtils;
 import com.microfocus.application.automation.tools.EncryptionUtils;
 import com.microfocus.application.automation.tools.Messages;
-import com.microfocus.application.automation.tools.lr.model.ScriptRTSSetModel;
-import com.microfocus.application.automation.tools.lr.model.SummaryDataLogModel;
 import com.microfocus.application.automation.tools.model.*;
-import com.microfocus.application.automation.tools.uft.model.SpecifyParametersModel;
 import com.microfocus.application.automation.tools.uft.model.UftRunAsUser;
-import com.microfocus.application.automation.tools.uft.model.UftSettingsModel;
 import com.microfocus.application.automation.tools.uft.utils.UftToolUtils;
 import hudson.*;
 import hudson.model.*;
@@ -46,7 +42,6 @@ import hudson.tasks.BuildStepDescriptor;
 import hudson.tasks.Builder;
 import hudson.util.FormValidation;
 import hudson.util.IOUtils;
-import hudson.util.Secret;
 import hudson.util.VariableResolver;
 import jenkins.model.Jenkins;
 import jenkins.tasks.SimpleBuildStep;
@@ -56,7 +51,6 @@ import org.jenkinsci.Symbol;
 import org.kohsuke.stapler.DataBoundConstructor;
 import org.kohsuke.stapler.DataBoundSetter;
 import org.kohsuke.stapler.QueryParameter;
-import org.kohsuke.stapler.bind.JavaScriptMethod;
 
 import javax.annotation.Nonnull;
 import java.io.ByteArrayOutputStream;
@@ -84,16 +78,6 @@ public class RunFromService extends Builder implements SimpleBuildStep {
 
     private RunFromServiceModel runFromServiceModel;
 
-    private FileSystemTestSetModel fileSystemTestSetModel;
-    private SpecifyParametersModel specifyParametersModel;
-    private boolean isParallelRunnerEnabled;
-    private boolean areParametersEnabled;
-    private SummaryDataLogModel summaryDataLogModel;
-
-    private ScriptRTSSetModel scriptRTSSetModel;
-
-    private UftSettingsModel uftSettingsModel;
-
     private Map<Long, String> resultFileNames;
 
 
@@ -115,14 +99,9 @@ public class RunFromService extends Builder implements SimpleBuildStep {
     //     this.runFromServiceModel = runFromServiceModel;
     // }
 
-    /**
-     * @param fsTests                   the fs tests
-     * @param fsTimeout                 the fs timeout
-     * @param fsReportPath              the fs rerport path
-     */
     @DataBoundConstructor
     public RunFromService(RunFromServiceModel runFromSm) {
-
+        runFromServiceModel = runFromSm;
     }
 
     public String getFsTimeout() {
@@ -229,13 +208,6 @@ public class RunFromService extends Builder implements SimpleBuildStep {
 
         mergedProperties.putAll(Objects.requireNonNull(runFromServiceModel).getProperties(env, currNode));
 
-        if (areParametersEnabled) {
-            try {
-                specifyParametersModel.addProperties(mergedProperties, "Test", currNode);
-            } catch (Exception e) {
-                listener.error("Error occurred while parsing parameter input, reverting back to empty array.");
-            }
-        }
         boolean isPrintTestParams = UftToolUtils.isPrintTestParams(build, listener);
         mergedProperties.put("printTestParams", isPrintTestParams ? "1" : "0");
 
@@ -277,14 +249,6 @@ public class RunFromService extends Builder implements SimpleBuildStep {
         resultFileNames.put(threadId, ResultFilename);
 
         mergedProperties.put("runType", AlmRunTypes.RunType.LoadRunner.toString());
-
-        if (summaryDataLogModel != null) {
-            summaryDataLogModel.addToProps(mergedProperties);
-        }
-
-        if (scriptRTSSetModel != null) {
-            scriptRTSSetModel.addScriptsToProps(mergedProperties, env);
-        }
 
         mergedProperties.put("resultsFilename", ResultFilename);
 
