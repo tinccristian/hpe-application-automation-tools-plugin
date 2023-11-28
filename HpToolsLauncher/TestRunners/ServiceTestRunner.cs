@@ -8,7 +8,7 @@ namespace HpToolsLauncher.TestRunners
     public class ServiceTestRunner
     {
         public string binPath = Environment.ExpandEnvironmentVariables("%LR_PATH%bin");
-        public string[] processesToKill = new string[] { "wlrun", "lrun_svc" };
+        public string[] processesToKill = new string[] { "wlrun", "lrun_svc", "CmdServiceClient" };
         public int _timeout;
 
         public bool RunServiceTest(string testPath, string resultsDirectory, int timeout)
@@ -30,7 +30,12 @@ namespace HpToolsLauncher.TestRunners
 
             string result = Read(client);
             LogMessage("Client response:", result);
-            if ((result.Contains("failed") || (result.Contains("empty")))) return false;
+            if ((result.Contains("failed") || (result.Contains("empty"))))
+            {
+                Cleanup(processesToKill);
+                return false;
+            }
+
 
             //Set the results folder directory
             string command1 ="setResultsDirectory " + resultsDirectory;
@@ -39,7 +44,11 @@ namespace HpToolsLauncher.TestRunners
 
             result = Read(client);
             LogMessage("Client response:",result);
-            if ((result.Contains("failed")|| (result.Contains("empty"))))   return false;
+            if ((result.Contains("failed") || (result.Contains("empty"))))
+            {
+                Cleanup(processesToKill);
+                return false;
+            }
 
             //Start the load test
             Write(client,"startLoadTest");
@@ -49,6 +58,7 @@ namespace HpToolsLauncher.TestRunners
             LogMessage("Client response:",result);
             if (result.Contains("failed"))
             {
+                Cleanup(processesToKill);
                 return false;
             }
             LogMessage("The test has started, waiting for the test to end.");
@@ -60,14 +70,15 @@ namespace HpToolsLauncher.TestRunners
             result = "";
             while (!result.Contains("Ended"))               //wait for the test to end
             {
-                Write(client, "getServiceState", 1000);     //ready, collating, running, ended
+                Write(client, "getServiceState");     //ready, collating, running, ended
                 result = Read(client);
                 if ((result.Contains("failed") || (result.Contains("empty"))))
                 {
                     LogMessage(result);
+                    Cleanup(processesToKill);
                     return false;
                 }
-                Thread.Sleep(1000);
+                Thread.Sleep(1);
             }
 
             stopWatch.Stop();
@@ -84,6 +95,7 @@ namespace HpToolsLauncher.TestRunners
         #region Process utilities
         public void StartLrunSvc()
         {
+            LogMessage("Starting lrun_svc.exe...");
             var startInfo = new System.Diagnostics.ProcessStartInfo
             {
                 WorkingDirectory = binPath,
@@ -94,7 +106,7 @@ namespace HpToolsLauncher.TestRunners
                 StartInfo = startInfo
             };
             proc.Start();
-            System.Threading.Thread.Sleep(_timeout);
+            System.Threading.Thread.Sleep(5000);
         }
 
         public Process StartClient()
@@ -112,7 +124,6 @@ namespace HpToolsLauncher.TestRunners
                 StartInfo = startInfo
             };
             proc.Start();
-            System.Threading.Thread.Sleep(_timeout);
             return proc;
         }
 
@@ -155,18 +166,18 @@ namespace HpToolsLauncher.TestRunners
         {
             StreamWriter writer = client.StandardInput;
             writer.WriteLine(command);
-            System.Threading.Thread.Sleep(_timeout);
             writer.Flush();
         }
         public void Write(Process client, string command, int timeout)
         {
             StreamWriter writer = client.StandardInput;
             writer.WriteLine(command);
-            System.Threading.Thread.Sleep(timeout);
+            //System.Threading.Thread.Sleep(timeout);
             writer.Flush();
         }
-        public string Read(Process client)
+        public string ReadLine(Process client)
         {
+
             StreamReader reader = client.StandardOutput;
             string result = "";
             do
@@ -183,6 +194,16 @@ namespace HpToolsLauncher.TestRunners
             client.StandardInput.Close();
             client.StandardOutput.Close();
             client.Dispose();
+        }
+        public string Read(Process client)
+        {
+            string result = ReadLine(client);
+            while (result.Length < 3)
+            {
+                result =ReadLine(client);
+                System.Threading.Thread.Sleep(5);
+            }
+            return result;
         }
     }
     #endregion
