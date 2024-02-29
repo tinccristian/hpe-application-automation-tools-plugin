@@ -7,6 +7,7 @@ namespace HpToolsLauncher.TestRunners
 {
     public class ServiceTestRunner
     {
+		//
         public string binPath = Environment.ExpandEnvironmentVariables("%LR_PATH%bin");
         public string[] processesToKill = new string[] { "wlrun", "lrun_svc", "CmdServiceClient" };
         public int _timeout;
